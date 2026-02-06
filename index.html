@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier League Predictions</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; 
+      background: #f0f2f5; 
+      padding: 15px; 
+      max-width: 900px; 
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    h1 { color: #1a1a1a; text-align: center; margin-bottom: 10px; }
+    h2 { color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 8px; margin-top: 25px; }
+    .box { 
+      background: #fff; 
+      padding: 20px; 
+      border-radius: 12px; 
+      margin-bottom: 20px; 
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    input, button, select { 
+      padding: 12px; 
+      margin: 6px 0; 
+      border-radius: 8px; 
+      border: 1px solid #ddd;
+      font-size: 14px;
+    }
+    button { 
+      background: #4CAF50; 
+      color: white; 
+      border: none; 
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #45a049; }
+    button.secondary { background: #f44336; }
+    .match-row { 
+      display: flex; 
+      gap: 10px; 
+      margin: 10px 0; 
+      align-items: center;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .match-row label { min-width: 200px; font-weight: 600; }
+    .match-row input { width: 70px; text-align: center; }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-top: 15px;
+    }
+    th, td { 
+      border: 1px solid #e0e0e0; 
+      padding: 12px; 
+      text-align: center; 
+    }
+    th { background: #4CAF50; color: white; }
+    .hidden { display: none !important; }
+    #userInfo { 
+      margin: 15px 0; 
+      padding: 12px; 
+      background: #e3f2fd; 
+      border-radius: 8px;
+    }
+    .error { color: #f44336; }
+    .success { color: #4CAF50; }
+    .admin-badge { 
+      background: #ff9800; 
+      color: white; 
+      padding: 4px 12px; 
+      border-radius: 20px; 
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>⚽ Premier League Predictions</h1>
+
+<div id="authSection" class="box">
+  <h2>🔐 تسجيل الدخول</h2>
+  <input id="email" type="email" placeholder="البريد الإلكتروني" style="width: 200px;">
+  <input id="password" type="password" placeholder="كلمة المرور" style="width: 200px;">
+  <br>
+  <button id="btnLogin">تسجيل دخول</button>
+  <button id="btnRegister">تسجيل جديد</button>
+  <button id="btnLogout" class="secondary hidden">تسجيل خروج</button>
+  <div id="userInfo"></div>
+</div>
+
+<div id="adminPanel" class="box hidden">
+  <h2>👑 لوحة المشرف <span class="admin-badge">ADMIN</span></h2>
+  
+  <h3>📋 إضافة مباريات الجولة</h3>
+  <input id="matchRound" type="number" placeholder="رقم الجولة (مثال: 24)">
+  <div id="matchesSetup"></div>
+  <button id="btnSaveMatches" class="hidden">💾 حفظ المباريات</button>
+  
+  <hr style="margin: 20px 0;">
+  
+  <h3>🏁 إدخال النتائج وقفل الجولة</h3>
+  <input id="adminRound" type="number" placeholder="رقم الجولة">
+  <button id="btnLoadForResults">تحميل المباريات</button>
+  <div id="adminResults"></div>
+  <button id="btnPostResults" class="hidden">🔒 حفظ النتائج + قفل الجولة</button>
+</div>
+
+<div id="userPanel" class="box hidden">
+  <h2>👤 إرسال التوقع</h2>
+  <input id="roundNumber" type="number" placeholder="رقم الجولة">
+  <button id="btnLoadMatches">تحميل المباريات</button>
+  
+  <div id="predictionsForm"></div>
+  
+  <div id="doubleMatchSection" class="hidden" style="margin-top: 15px; padding: 15px; background: #fff3e0; border-radius: 8px;">
+    <label><strong>🎯 المباراة المضاعفة:</strong></label>
+    <select id="doubleMatch">
+      <option value="0">بدون مضاعفة</option>
+    </select>
+  </div>
+  
+  <button id="btnSubmitPrediction" class="hidden" style="margin-top: 15px;">✅ إرسال التوقع</button>
+</div>
+
+<div class="box">
+  <h2>🏆 جدول المتصدرين</h2>
+  <button id="btnRefreshLeaderboard">🔄 تحديث</button>
+  <div id="leaderboardContainer"><p style="text-align: center; color: #666;">اضغط "تحديث"</p></div>
+</div>
+
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm'
+
+  // ✅ مفاتيح Supabase
+  const SUPABASE_URL = 'https://tzgetxouxfkcyvosayjq.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6Z2V0eG91eGZrY3l2b3NheWpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzODUxNDEsImV4cCI6MjA4NTk2MTE0MX0.4rXVi9_ReBEVXPaDoFciEwSenmq4SUa-RQjEsbfP4mk';
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const $ = id => document.getElementById(id);
+
+  let currentUser = null;
+  let isAdmin = false;
+  let currentMatches = [];
+
+  // Auth
+  $('btnLogin').onclick = async () => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: $('email').value,
+      password: $('password').value
+    });
+    if (error) return showError('خطأ في تسجيل الدخول: ' + error.message);
+    await initUser();
+  };
+
+  $('btnRegister').onclick = async () => {
+    const { data, error } = await supabase.auth.signUp({
+      email: $('email').value,
+      password: $('password').value
+    });
+    if (error) return showError('خطأ في التسجيل: ' + error.message);
+    showSuccess('تم إنشاء الحساب!');
+  };
+
+  $('btnLogout').onclick = async () => {
+    await supabase.auth.signOut();
+    location.reload();
+  };
+
+  async function initUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      $('userInfo').innerHTML = '<span class="error">غير مسجل</span>';
+      return;
+    }
+
+    currentUser = user;
+    const { data: adminData } = await supabase.from('admins').select('*').eq('uid', user.id).single();
+    isAdmin = !!adminData;
+
+    let html = `<strong>مرحباً ${user.email}</strong>`;
+    if (isAdmin) html += ' <span class="admin-badge">ADMIN</span>';
+    $('userInfo').innerHTML = html;
+
+    $('btnLogin').classList.add('hidden');
+    $('btnRegister').classList.add('hidden');
+    $('btnLogout').classList.remove('hidden');
+
+    if (isAdmin) {
+      $('adminPanel').classList.remove('hidden');
+      setupAdminMatches();
+    }
+    $('userPanel').classList.remove('hidden');
+    loadLeaderboard();
+  }
+
+  function showError(msg) { $('userInfo').innerHTML = `<span class="error">${msg}</span>`; }
+  function showSuccess(msg) { $('userInfo').innerHTML = `<span class="success">${msg}</span>`; }
+
+  // Admin: Setup Matches
+  function setupAdminMatches() {
+    const container = $('matchesSetup');
+    container.innerHTML = '';
+    for (let i = 1; i <= 10; i++) {
+      const div = document.createElement('div');
+      div.className = 'match-row';
+      div.innerHTML = `<label>مباراة ${i}:</label><input id="setupName${i}" placeholder="مثال: الأهلي vs الهلال" style="flex: 1;">`;
+      container.appendChild(div);
+    }
+    $('btnSaveMatches').classList.remove('hidden');
+  }
+
+  $('btnSaveMatches').onclick = async () => {
+    const roundNum = $('matchRound').value;
+    if (!roundNum) return showError('أدخل رقم الجولة');
+    const roundId = `round_${roundNum}`;
+    
+    await supabase.from('rounds').upsert({ id: roundId, round_number: parseInt(roundNum), is_locked: false });
+    
+    const matches = [];
+    for (let i = 1; i <= 10; i++) {
+      const name = $(`setupName${i}`).value.trim();
+      if (!name) return showError(`أدخل اسم مباراة ${i}`);
+      matches.push({ round_id: roundId, match_index: i, name });
+    }
+
+    const { error } = await supabase.from('matches').upsert(matches, { onConflict: ['round_id', 'match_index'] });
+    if (error) return showError('خطأ: ' + error.message);
+    showSuccess('✅ تم حفظ المباريات');
+  };
+
+  // Admin: Post Results
+  $('btnLoadForResults').onclick = async () => {
+    const roundNum = $('adminRound').value;
+    if (!roundNum) return showError('أدخل رقم الجولة');
+    const roundId = `round_${roundNum}`;
+    
+    const { data: matches, error } = await supabase.from('matches').select('*').eq('round_id', roundId).order('match_index');
+    if (error || !matches.length) return showError('لا توجد مباريات');
+
+    currentMatches = matches;
+    const container = $('adminResults');
+    container.innerHTML = '';
+    matches.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'match-row';
+      div.innerHTML = `<label>${m.name}</label><div><input id="res${m.match_index}h" type="number" placeholder="أرضي"> - <input id="res${m.match_index}a" type="number" placeholder="ضيف"></div>`;
+      container.appendChild(div);
+    });
+    $('btnPostResults').classList.remove('hidden');
+  };
+
+  $('btnPostResults').onclick = async () => {
+    const roundNum = $('adminRound').value;
+    const roundId = `round_${roundNum}`;
+    const results = { round_id: roundId };
+    
+    for (let i = 1; i <= 10; i++) {
+      results[`match_${i}_home`] = parseInt($(`res${i}h`).value) || 0;
+      results[`match_${i}_away`] = parseInt($(`res${i}a`).value) || 0;
+    }
+
+    const { error } = await supabase.from('actual_results').upsert(results, { onConflict: ['round_id'] });
+    if (error) return showError('خطأ: ' + error.message);
+
+    await supabase.from('rounds').upsert({ id: roundId, is_locked: true }, { onConflict: ['id'] });
+    showSuccess('🏆 تم حفظ النتائج وقفل الجولة!');
+    loadLeaderboard();
+  };
+
+  // User: Predictions
+  $('btnLoadMatches').onclick = async () => {
+    const roundNum = $('roundNumber').value;
+    const roundId = `round_${roundNum}`;
+    
+    const { data: round } = await supabase.from('rounds').select('is_locked').eq('id', roundId).single();
+    if (round?.is_locked) return showError('❌ الجولة مقفلة');
+
+    const { data: matches, error } = await supabase.from('matches').select('*').eq('round_id', roundId).order('match_index');
+    if (error || !matches.length) return showError('لا توجد مباريات');
+
+    currentMatches = matches;
+    const container = $('predictionsForm');
+    container.innerHTML = '';
+    const doubleSelect = $('doubleMatch');
+    doubleSelect.innerHTML = '<option value="0">بدون مضاعفة</option>';
+
+    matches.forEach(m => {
+      const div = document.createElement('div');
+      div.className = 'match-row';
+      div.innerHTML = `<label>${m.name}</label><div><input id="pred${m.match_index}h" type="number" placeholder="0"> - <input id="pred${m.match_index}a" type="number" placeholder="0"></div>`;
+      container.appendChild(div);
+      
+      const opt = document.createElement('option');
+      opt.value = m.match_index;
+      opt.text = m.name;
+      doubleSelect.add(opt);
+    });
+
+    $('doubleMatchSection').classList.remove('hidden');
+    $('btnSubmitPrediction').classList.remove('hidden');
+  };
+
+  $('btnSubmitPrediction').onclick = async () => {
+    if (!currentUser) return showError('سجل دخول أولاً');
+    const roundNum = $('roundNumber').value;
+    const roundId = `round_${roundNum}`;
+
+    const prediction = {
+      user_id: currentUser.id,
+      participant_name: currentUser.email,
+      round_id: roundId,
+      double_match: parseInt($('doubleMatch').value) || 0
+    };
+
+    for (let i = 1; i <= 10; i++) {
+      prediction[`match_${i}_home`] = parseInt($(`pred${i}h`).value) || 0;
+      prediction[`match_${i}_away`] = parseInt($(`pred${i}a`).value) || 0;
+    }
+
+    const { error } = await supabase.from('predictions').upsert(prediction, { onConflict: ['user_id', 'round_id'] });
+    if (error) return showError('خطأ: ' + error.message);
+    showSuccess('✅ تم إرسال التوقع');
+  };
+
+  // Leaderboard
+  $('btnRefreshLeaderboard').onclick = loadLeaderboard;
+
+  async function loadLeaderboard() {
+    const { data, error } = await supabase.from('leaderboard').select('*').order('total_points', { ascending: false }).limit(50);
+    if (error) return $('leaderboardContainer').innerHTML = '<p class="error">خطأ</p>';
+    
+    if (!data?.length) return $('leaderboardContainer').innerHTML = '<p>لا توجد بيانات</p>';
+
+    let html = '<table><tr><th>المركز</th><th>المتسابق</th><th>النقاط</th></tr>';
+    data.forEach((row, index) => {
+      html += `<tr><td>#${row.rank || index + 1}</td><td>${row.participant_name || 'مجهول'}</td><td>${row.total_points || 0}</td></tr>`;
+    });
+    html += '</table>';
+    $('leaderboardContainer').innerHTML = html;
+  }
+
+  supabase.auth.onAuthStateChange(() => initUser());
+  initUser();
+</script>
+
+</body>
+</html>
